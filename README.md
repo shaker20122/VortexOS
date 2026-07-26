@@ -23,6 +23,16 @@
 
 ---
 
+### ⚠️ Rules of Engagement
+
+> [!WARNING]
+> **Root Privileges Required:** You MUST run the installation script as Root (`sudo`). If not, it won't be able to touch system files or configure the kernel, and access will be completely denied.
+
+> [!IMPORTANT]
+> **No Tampering:** Don't rip the core S_12 Security Engine logic. This is my work and my personal architecture. Respect the code.
+
+---
+
 ### ⚙️ How it works
 
 * **Hyprland Optimization:** Pre-configured for hyper-smooth window management, utilizing minimal system resources for maximum visual output.
@@ -50,4 +60,4 @@ Clone the repository and execute the setup script to initialize VortexOS:
 git clone [https://github.com/shaker20122/VortexOS.git](https://github.com/shaker20122/VortexOS.git)
 cd VortexOS
 chmod +x install.sh
-./install.sh
+sudo ./install.sh
