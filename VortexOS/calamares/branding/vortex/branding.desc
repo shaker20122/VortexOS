@@ -1,0 +1,18 @@
+---
+componentName:  vortex
+
+welcomeStyleCalamares: true
+
+strings:
+    productName:         Vortex OS
+    shortProductName:    Vortex
+    version:             1.0 LTS
+    shortVersion:        1.0
+    versionedName:       Vortex OS 1.0
+    productUrl:          https://github.com/shaker20122/VortexOS
+    supportUrl:          https://github.com/shaker20122/VortexOS
+
+style:
+   sidebarBackground:    "#0f0f17"
+   sidebarText:          "#ffffff"
+   sidebarTextSelect:    "#8b5cf6"

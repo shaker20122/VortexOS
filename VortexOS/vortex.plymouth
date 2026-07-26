@@ -1,0 +1,11 @@
+[Plymouth Theme]
+Name=Vortex OS Boot
+Description=Minimal ASCII Boot Splash for Vortex OS
+ModuleName=text
+
+[text]
+title=Vortex OS
+black=0x0f0f17
+white=0xffffff
+blue=0x8b5cf6
+brown=0xd946ef

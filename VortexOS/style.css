@@ -1,0 +1,23 @@
+* {
+    border: none;
+    font-family: "JetBrains Mono", sans-serif;
+    font-size: 13px;
+}
+
+window#waybar {
+    background-color: rgba(15, 15, 23, 0.85);
+    color: #ffffff;
+    border-bottom: 2px solid #8b5cf6;
+}
+
+#clock, #cpu, #memory, #battery {
+    padding: 0 12px;
+    margin: 3px 4px;
+    background-color: #1e1e2e;
+    border-radius: 6px;
+    color: #c4b5fd;
+}
+
+#memory {
+    color: #a7f3d0;
+}
