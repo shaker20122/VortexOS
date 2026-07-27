@@ -4,15 +4,14 @@ echo "--------------------------------------------------"
 echo "   Installing Vortex OS Core & S_12 Security      "
 echo "--------------------------------------------------"
 
-# 1. Update system and install base packages via pacman
 pacman -Syu --noconfirm
 pacman -S --noconfirm \
     hyprland waybar rofi-wayland kitty fastfetch git base-devel \
     ttf-jetbrains-mono ttf-font-awesome plymouth sddm \
     firefox dolphin ark p7zip unrar lxappearance pavucontrol \
-    calamares kpmcore ufw fail2ban
+    kpmcore ufw fail2ban debugedit fakeroot
 
-# 2. Setup a temporary build user for AUR (since makepkg cannot run as root)
+
 if [ "$(id -u)" -eq 0 ]; then
     if ! id "build" &>/dev/null; then
         useradd -m build
@@ -20,18 +19,18 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
 fi
 
-# 3. Install YAY (AUR Helper) if not present
+# 3. تثبيت YAY (مساعد AUR)
 if ! command -v yay &> /dev/null; then
     echo "Installing YAY (AUR Helper)..."
     rm -rf /tmp/yay
     su build -c "git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm"
 fi
 
-# 4. Install GUI App Store & Background Tools via AUR
-echo "Installing Software Center & Tools..."
-su build -c "yay -S --noconfirm awww-git bauh"
 
-# 5. Create Directory Structure in home config
+echo "Installing Calamares Installer & Tools from AUR..."
+su build -c "yay -S --noconfirm calamares awww-git bauh"
+
+# 5. تجهيز مسارات الإعدادات
 TARGET_HOME="${HOME}"
 if [ "$USER" = "root" ] && [ -d "/home/liveuser" ]; then
     TARGET_HOME="/home/liveuser"
@@ -41,35 +40,35 @@ mkdir -p "$TARGET_HOME/.config/hypr/backgrounds"
 mkdir -p "$TARGET_HOME/.config/waybar"
 mkdir -p "$TARGET_HOME/.config/fastfetch"
 
-# 6. Copy Configuration Files
+ 
 [ -f "hyprland.conf" ] && cp hyprland.conf "$TARGET_HOME/.config/hypr/"
 [ -f "waybar-config.jsonc" ] && cp waybar-config.jsonc "$TARGET_HOME/.config/waybar/"
 [ -f "style.css" ] && cp style.css "$TARGET_HOME/.config/waybar/"
 [ -d "fastfetch" ] && cp -r fastfetch/* "$TARGET_HOME/.config/fastfetch/"
 [ -d "backgrounds" ] && cp -r backgrounds/* "$TARGET_HOME/.config/hypr/backgrounds/"
 
-# 7. Setup S_12 Security Tool
+
 if [ -f "s12-sec" ]; then
     chmod +x s12-sec
     cp s12-sec /usr/local/bin/
 fi
 
-# 8. Enable & Configure S_12 Security Engine (UFW & Fail2ban)
+
 echo "Activating S_12 Security Shield..."
 systemctl enable ufw
 ufw default deny incoming
 ufw default allow outgoing
 echo "y" | ufw enable
 systemctl enable fail2ban
+        
 
-# 9. Set Fastfetch to run on shell startup
 if [ -f "$TARGET_HOME/.bashrc" ]; then
     if ! grep -q "fastfetch" "$TARGET_HOME/.bashrc"; then
         echo "fastfetch" >> "$TARGET_HOME/.bashrc"
     fi
 fi
 
-# 10. Setup Plymouth Boot Theme
+
 mkdir -p /usr/share/plymouth/themes/vortex
 [ -f "vortex.plymouth" ] && cp vortex.plymouth /usr/share/plymouth/themes/vortex/
 [ -f "vortex.script" ] && cp vortex.script /usr/share/plymouth/themes/vortex/
@@ -83,13 +82,13 @@ if ! grep -q "plymouth" /etc/mkinitcpio.conf; then
     mkinitcpio -P
 fi
 
-# 11. Setup Calamares Installer Branding
+
 if [ -d "calamares" ]; then
     mkdir -p /usr/share/calamares/branding/
     cp -r calamares/branding/vortex /usr/share/calamares/branding/
 fi
 
-# 12. Enable SDDM Login Manager
+
 systemctl enable sddm
 
 echo "--------------------------------------------------"
