@@ -2,6 +2,7 @@ archiso
 base
 linux
 linux-firmware
+syslinux
 hyprland
 waybar
 rofi-wayland
