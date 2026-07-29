@@ -15,27 +15,33 @@ jobs:
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
             set -euo pipefail
             
-            echo '=== 1. تجهيز مفاتيح pacman ==='
+            echo '=== 1. تهيئة المفاتيح والحزم ==='
             pacman -Sy --noconfirm archlinux-keyring
             pacman-key --init
             pacman-key --populate archlinux
-            
-            echo '=== 2. تثبيت أدوات البناء والإقلاع ==='
             pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
             
             cd /workspace
             
-            echo '=== 3. البحث عن مجلد البروفايل ==='
-            FOUND=\$(find . -path './.git' -prune -o -name profiledef.sh -print -quit)
-            if [ -z \"\$FOUND\" ]; then
-              echo 'خطأ: لم يتم العثور على profiledef.sh في المستودع!'
-              exit 1
+            echo '=== 2. تحديد مجلد البروفايل ==='
+            # البحث عن مجلد profiledef.sh المباشر (تجاهل المجلد الرئيسي /workspace نفسه)
+            DIR=\$(find . -mindepth 2 -name profiledef.sh -exec dirname {} \; | head -n 1)
+            
+            # إذا لم يجده في المجلدات الفرعية، نتحقق من مجلد VortexOS أو المجلد الحالي
+            if [ -z \"\$DIR\" ]; then
+              if [ -f \"VortexOS/profiledef.sh\" ]; then
+                DIR=\"VortexOS\"
+              elif [ -f \"profiledef.sh\" ]; then
+                DIR=\".\"
+              else
+                echo \"ERROR: profiledef.sh not found!\"
+                exit 1
+              fi
             fi
             
-            DIR=\$(dirname \"\$FOUND\")
-            echo \"تم العثور على البروفايل في المجلد: \$DIR\"
+            echo \"Building from profile directory: \$DIR\"
             
-            echo '=== 4. بدء بناء الـ ISO 🚀 ==='
+            echo '=== 3. تشغيل البناء 🚀 ==='
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out \"\$DIR\"
           "
 
