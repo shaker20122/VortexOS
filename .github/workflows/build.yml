@@ -10,13 +10,32 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build ISO in Arch Linux Docker
+      - name: Build ISO using Arch Linux Docker Container
         run: |
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
-            pacman -Syu --noconfirm archiso && \
-            cd /workspace && \
-            DIR=\$(find . -name profiledef.sh -exec dirname {} \; | head -n 1) && \
-            echo \"Building from directory: \$DIR\" && \
+            set -euo pipefail
+            
+            echo '=== 1. تجهيز مفاتيح pacman ==='
+            pacman -Sy --noconfirm archlinux-keyring
+            pacman-key --init
+            pacman-key --populate archlinux
+            
+            echo '=== 2. تثبيت أدوات البناء والإقلاع ==='
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
+            
+            cd /workspace
+            
+            echo '=== 3. البحث عن مجلد البروفايل ==='
+            FOUND=\$(find . -path './.git' -prune -o -name profiledef.sh -print -quit)
+            if [ -z \"\$FOUND\" ]; then
+              echo 'خطأ: لم يتم العثور على profiledef.sh في المستودع!'
+              exit 1
+            fi
+            
+            DIR=\$(dirname \"\$FOUND\")
+            echo \"تم العثور على البروفايل في المجلد: \$DIR\"
+            
+            echo '=== 4. بدء بناء الـ ISO 🚀 ==='
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out \"\$DIR\"
           "
 
