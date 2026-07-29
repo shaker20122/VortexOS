@@ -14,35 +14,34 @@ jobs:
         run: |
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
             set -euo pipefail
-            
+
             echo '=== 1. تهيئة المفاتيح والحزم ==='
-            pacman -Sy --noconfirm archlinux-keyring
-            pacman-key --init
+            pacman-key --init || {
+              pacman -Sy --noconfirm haveged
+              systemctl start haveged || /usr/bin/haveged -w 1024 &
+              pacman-key --init
+            }
             pacman-key --populate archlinux
+            pacman -Sy --noconfirm archlinux-keyring
             pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
+
+            echo '=== 2. تجميع ملفات البروفايل في مجلد موحد ==='
+            mkdir -p /tmp/build_profile
             
-            cd /workspace
+            # 1. نقل ملفات المجلد الرئيسي إن وجدت (مثل profiledef.sh و packages)
+            cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
             
-            echo '=== 2. تحديد مجلد البروفايل ==='
-            # البحث عن مجلد profiledef.sh المباشر (تجاهل المجلد الرئيسي /workspace نفسه)
-            DIR=\$(find . -mindepth 2 -name profiledef.sh -exec dirname {} \; | head -n 1)
-            
-            # إذا لم يجده في المجلدات الفرعية، نتحقق من مجلد VortexOS أو المجلد الحالي
-            if [ -z \"\$DIR\" ]; then
-              if [ -f \"VortexOS/profiledef.sh\" ]; then
-                DIR=\"VortexOS\"
-              elif [ -f \"profiledef.sh\" ]; then
-                DIR=\".\"
-              else
-                echo \"ERROR: profiledef.sh not found!\"
-                exit 1
-              fi
+            # 2. نقل ملفات مجلد VortexOS لدمجها بنفس المجلد
+            if [ -d '/workspace/VortexOS' ]; then
+              cp -r /workspace/VortexOS/* /tmp/build_profile/
             fi
-            
-            echo \"Building from profile directory: \$DIR\"
-            
+
+            cd /tmp/build_profile
+            echo 'محتويات مجلد البناء النهائي:'
+            ls -la
+
             echo '=== 3. تشغيل البناء 🚀 ==='
-            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out \"\$DIR\"
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
           "
 
       - name: Upload ISO Artifact
