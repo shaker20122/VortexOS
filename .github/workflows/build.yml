@@ -1,0 +1,31 @@
+name: Build VortexOS ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install ArchISO Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y arch-install-scripts debootstrap
+
+      - name: Build Arch ISO using Arch Linux Docker Container
+        run: |
+          docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
+            pacman -Syu --noconfirm archiso && \
+            cd /workspace && \
+            if [ -d 'VortexOS' ]; then cd VortexOS; fi && \
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
+          "
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VortexOS-ISO
+          path: out/*.iso
