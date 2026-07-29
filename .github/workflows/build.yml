@@ -25,21 +25,19 @@ jobs:
             pacman -Sy --noconfirm archlinux-keyring
             pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
 
-            echo '=== 2. تجميع ملفات البروفايل في مجلد موحد ==='
+            echo '=== 2. تجهيز قالب Arch الرسمي ودمج ملفات مشروعك ==='
             mkdir -p /tmp/build_profile
             
-            # 1. نقل ملفات المجلد الرئيسي إن وجدت (مثل profiledef.sh و packages)
-            cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
+            # 1. جلب الملفات والقوالب الرسمية (pacman.conf, syslinux, grub)
+            cp -r /usr/share/archiso/configs/releng/* /tmp/build_profile/
             
-            # 2. نقل ملفات مجلد VortexOS لدمجها بنفس المجلد
+            # 2. دمج وتطبيق ملفات مشروعك المعدلة فوق القالب
+            cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
             if [ -d '/workspace/VortexOS' ]; then
-              cp -r /workspace/VortexOS/* /tmp/build_profile/
+              cp -r /workspace/VortexOS/* /tmp/build_profile/ 2>/dev/null || true
             fi
 
             cd /tmp/build_profile
-            echo 'محتويات مجلد البناء النهائي:'
-            ls -la
-
             echo '=== 3. تشغيل البناء 🚀 ==='
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
           "
