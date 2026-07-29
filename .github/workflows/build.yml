@@ -10,18 +10,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install ArchISO Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y arch-install-scripts debootstrap
-
       - name: Build Arch ISO using Arch Linux Docker Container
         run: |
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
             pacman -Syu --noconfirm archiso && \
             cd /workspace && \
-            if [ -d 'VortexOS' ]; then cd VortexOS; fi && \
-            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
+            if [ -f 'profiledef.sh' ]; then
+              PROFILE_DIR='.'
+            elif [ -d 'VortexOS' ] && [ -f 'VortexOS/profiledef.sh' ]; then
+              PROFILE_DIR='VortexOS'
+            else
+              PROFILE_DIR=\$(find . -name 'profiledef.sh' -exec dirname {} \;)
+            fi && \
+            echo \"Building from profile directory: \$PROFILE_DIR\" && \
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out \"\$PROFILE_DIR\"
           "
 
       - name: Upload ISO Artifact
