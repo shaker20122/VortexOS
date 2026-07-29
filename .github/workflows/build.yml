@@ -23,22 +23,28 @@ jobs:
             }
             pacman-key --populate archlinux
             pacman -Sy --noconfirm archlinux-keyring
-            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr sed
 
             echo '=== 2. تجهيز قالب Arch الرسمي ودمج ملفات مشروعك ==='
             mkdir -p /tmp/build_profile
             
-            # 1. جلب الملفات والقوالب الرسمية (pacman.conf, syslinux, grub)
+            # جلب قالب releng الأساسي
             cp -r /usr/share/archiso/configs/releng/* /tmp/build_profile/
             
-            # 2. دمج وتطبيق ملفات مشروعك المعدلة فوق القالب
+            # دمج ملفات مشروعك من الريبو فوق القالب (بما فيها تعديلات الإقلاع)
             cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
             if [ -d '/workspace/VortexOS' ]; then
               cp -r /workspace/VortexOS/* /tmp/build_profile/ 2>/dev/null || true
             fi
 
             cd /tmp/build_profile
-            echo '=== 3. تشغيل البناء 🚀 ==='
+
+            echo '=== 3. إصلاح وتثبيت الاسم (Fix Boot Label) ==='
+            # استبدال أي متغيرات متبقية في ملفات الإقلاع بـ VortexOS مباشرة
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
+
+            echo '=== 4. تشغيل البناء 🚀 ==='
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
           "
 
