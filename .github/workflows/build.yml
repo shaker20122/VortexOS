@@ -23,11 +23,9 @@ jobs:
 
             echo '=== 2. تجهيز البروفايل من القالب الرسمي ==='
             mkdir -p /tmp/profile
-            
-            # نسخ قالب releng الرسمي كاملاً
             cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
 
-            # دمج مجلد VortexOS وملفاتك إن وجدت
+            # دمج ملفات المستودع
             [ -d '/workspace/VortexOS' ] && cp -rf /workspace/VortexOS/* /tmp/profile/ || true
             [ -f '/workspace/packages.x86_64' ] && cp -f /workspace/packages.x86_64 /tmp/profile/ || true
             [ -d '/workspace/grub' ] && cp -rf /workspace/grub /tmp/profile/ || true
@@ -36,21 +34,34 @@ jobs:
 
             cd /tmp/profile
 
-            echo '=== 3. تصحيح Bootmodes و Label ==='
-            sed -i 's/^iso_name=.*/iso_name=\"VortexOS\"/' profiledef.sh
-            sed -i 's/^iso_label=.*/iso_label=\"VortexOS\"/' profiledef.sh
-            
-            # تصحيح أنماط الإقلاع لكتالوجات mkarchiso الحديثة
-            sed -i \"s/bootmodes=(.*/bootmodes=('bios.syslinux' 'uefi.grub')/\" profiledef.sh
+            echo '=== 3. إعادة كتابة profiledef.sh بشكل سليم تماماً ==='
+            cat << 'EOF' > profiledef.sh
+#!/bin/bash
+# profiledef.sh for Vortex OS
 
-            # إصلاح سطر الإقلاع لمنع emergency shell
+iso_name="VortexOS"
+iso_label="VortexOS"
+iso_publisher="Shaker S_12 <https://github.com/shaker20122>"
+iso_application="Vortex OS Live/Installation Media"
+iso_version="$(date +%Y.%m.%d)"
+install_dir="arch"
+buildmodes=('iso')
+bootmodes=('bios.syslinux' 'uefi.grub')
+arch="x86_64"
+pacman_conf="pacman.conf"
+file_permissions=(
+  ["/etc/shadow"]="0:0:0400"
+)
+EOF
+
+            chmod +x profiledef.sh
+
+            echo '=== 4. إصلاح سطر الإقلاع في الإعدادات ==='
             find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
             find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
             find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
 
-            chmod +x profiledef.sh 2>/dev/null || true
-
-            echo '=== 4. تشغيل mkarchiso 🚀 ==='
+            echo '=== 5. تشغيل mkarchiso 🚀 ==='
             mkdir -p /workspace/out
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
           "
