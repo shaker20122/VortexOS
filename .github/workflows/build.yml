@@ -23,8 +23,16 @@ jobs:
 
             echo '=== 2. تجهيز مجلد البناء ==='
             mkdir -p /tmp/profile
-            cp -r /workspace/* /tmp/profile/ 2>/dev/null || true
-            rm -rf /tmp/profile/.github /tmp/profile/.git
+
+            # إذا كانت ملفات التوزيعة داخل مجلد VortexOS انسخ محتوياته
+            if [ -d '/workspace/VortexOS' ]; then
+              cp -r /workspace/VortexOS/* /tmp/profile/ 2>/dev/null || true
+            fi
+
+            # نسخ بقية الملفات الأساسية مثل grub و syslinux و efiboot إن وجدت في الجذر
+            cp -r /workspace/efiboot /tmp/profile/ 2>/dev/null || true
+            cp -r /workspace/grub /tmp/profile/ 2>/dev/null || true
+            cp -r /workspace/syslinux /tmp/profile/ 2>/dev/null || true
 
             cd /tmp/profile
 
