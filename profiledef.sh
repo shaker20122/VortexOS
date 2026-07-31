@@ -19,17 +19,17 @@ jobs:
             pacman-key --init
             pacman-key --populate archlinux
             pacman -Sy --noconfirm archlinux-keyring
-            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr rsync
 
-            echo '=== 2. دمج وتوحيد ملفات البروفايل ==='
+            echo '=== 2. تجهيز مجلد البناء وتجاهل ملفات Workflow ==='
             mkdir -p /tmp/profile
             
-            # 1) نسخ كل شيء من root المستودع (بما فيه grub, efiboot, syslinux, profiledef.sh)
-            cp -r /workspace/* /tmp/profile/ 2>/dev/null || true
+            # نسخ ملفات المستودع باستثناء مجلد .github و .git
+            rsync -av --exclude='.github' --exclude='.git' /workspace/ /tmp/profile/
 
-            # 2) نسخ محتويات مجلد VortexOS فوقها لدمج الحزم والسكربتات
+            # دمج مجلد VortexOS إذا كان موجوداً
             if [ -d '/workspace/VortexOS' ]; then
-              cp -r /workspace/VortexOS/* /tmp/profile/ 2>/dev/null || true
+              rsync -av /workspace/VortexOS/ /tmp/profile/
             fi
 
             cd /tmp/profile
