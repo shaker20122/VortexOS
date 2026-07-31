@@ -1,18 +1,56 @@
-#!/bin/bash
-# profiledef.sh for Vortex OS
+name: Build VortexOS ISO
 
-iso_name="VortexOS"
-iso_label="VortexOS"
-iso_publisher="Shaker S_12 <https://github.com/shaker20122>"
-iso_application="Vortex OS Live/Installation Media"
-iso_version="$(date +%Y.%m.%d)"
-install_dir="arch"
-buildmodes=('iso')
-bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito'
-          'uefi-ia32.grub.esp' 'uefi-x64.grub.esp'
-          'uefi-ia32.grub.eltorito' 'uefi-x64.grub.eltorito')
-arch="x86_64"
-pacman_conf="pacman.conf"
-file_permissions=(
-  ["/etc/shadow"]="0:0:0400"
-)
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build ISO using Arch Linux Docker Container
+        run: |
+          docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
+            set -euo pipefail
+
+            echo '=== 1. تهيئة المفاتيح والحزم ==='
+            pacman-key --init
+            pacman-key --populate archlinux
+            pacman -Sy --noconfirm archlinux-keyring
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr sed
+
+            echo '=== 2. تجهيز مجلد البناء ==='
+            mkdir -p /tmp/build_profile
+            
+            # نسخ قالب releng الأساسي
+            cp -r /usr/share/archiso/configs/releng/* /tmp/build_profile/
+
+            # دمج ملفاتك من الجذر ومجلد VortexOS فوق القالب
+            cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
+            if [ -d '/workspace/VortexOS' ]; then
+              cp -r /workspace/VortexOS/* /tmp/build_profile/ 2>/dev/null || true
+            fi
+
+            cd /tmp/build_profile
+
+            echo '=== 3. فرض إعدادات VortexOS بشكل قاطع ==='
+            # كتابة iso_label في profiledef.sh مباشرة
+            sed -i 's/^iso_label=.*/iso_label="VortexOS"/' profiledef.sh
+
+            # استبدال متغيرات الإقلاع بـ VortexOS في جميع الملفات بلا استثناء
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/archisosearchuuid=[^ ]*/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
+
+            echo '=== 4. تشغيل عملية البناء 🚀 ==='
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
+          "
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VortexOS-ISO
+          path: out/*.iso
