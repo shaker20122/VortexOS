@@ -12,53 +12,61 @@ jobs:
 
       - name: Build ISO using Arch Linux Docker Container
         run: |
-          docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
-            set -e
+          # 1. إنشاء profiledef.sh على الـ Runner بطريقة آمنة بدون مشاكل Quoting
+          cat << 'PROFILEDEF' > profiledef.sh
+#!/bin/bash
+iso_name="VortexOS"
+iso_label="VortexOS"
+iso_publisher="Shaker S_12 <https://github.com/shaker20122>"
+iso_application="Vortex OS Live/Installation Media"
+iso_version="$(date +%Y.%m.%d)"
+install_dir="arch"
+buildmodes=("iso")
+bootmodes=("bios.syslinux" "uefi.grub")
+arch="x86_64"
+pacman_conf="pacman.conf"
+file_permissions=(["/etc/shadow"]="0:0:0400")
+PROFILEDEF
 
-            echo '=== 1. تثبيت حزم البناء ==='
-            pacman-key --init
-            pacman-key --populate archlinux
-            pacman -Sy --noconfirm archlinux-keyring
-            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
+          chmod +x profiledef.sh
 
-            echo '=== 2. تجهيز البروفايل من القالب الرسمي ==='
-            mkdir -p /tmp/profile
-            cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
+          # 2. تشغيل عملية البناء داخل حاوية Arch Linux
+          docker run --privileged --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            archlinux:latest bash -c "
+              set -e
 
-            # دمج ملفات المستودع
-            [ -d '/workspace/VortexOS' ] && cp -rf /workspace/VortexOS/* /tmp/profile/ || true
-            [ -f '/workspace/packages.x86_64' ] && cp -f /workspace/packages.x86_64 /tmp/profile/ || true
-            [ -d '/workspace/grub' ] && cp -rf /workspace/grub /tmp/profile/ || true
-            [ -d '/workspace/syslinux' ] && cp -rf /workspace/syslinux /tmp/profile/ || true
-            [ -d '/workspace/efiboot' ] && cp -rf /workspace/efiboot /tmp/profile/ || true
+              echo '=== 1. تثبيت حزم البناء ==='
+              pacman-key --init
+              pacman-key --populate archlinux
+              pacman -Sy --noconfirm archlinux-keyring
+              pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
 
-            cd /tmp/profile
+              echo '=== 2. تجهيز البروفايل من القالب الرسمي ==='
+              mkdir -p /tmp/profile
+              cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
 
-            echo '=== 3. كتابة profiledef.sh صريح بدون أخطاء Syntax ==='
-            echo '#!/bin/bash' > profiledef.sh
-            echo 'iso_name="VortexOS"' >> profiledef.sh
-            echo 'iso_label="VortexOS"' >> profiledef.sh
-            echo 'iso_publisher="Shaker S_12 <https://github.com/shaker20122>"' >> profiledef.sh
-            echo 'iso_application="Vortex OS Live/Installation Media"' >> profiledef.sh
-            echo 'iso_version="$(date +%Y.%m.%d)"' >> profiledef.sh
-            echo 'install_dir="arch"' >> profiledef.sh
-            echo 'buildmodes=("iso")' >> profiledef.sh
-            echo 'bootmodes=("bios.syslinux" "uefi.grub")' >> profiledef.sh
-            echo 'arch="x86_64"' >> profiledef.sh
-            echo 'pacman_conf="pacman.conf"' >> profiledef.sh
-            echo 'file_permissions=(["/etc/shadow"]="0:0:0400")' >> profiledef.sh
+              # دمج ملفات المستودع
+              [ -d '/workspace/VortexOS' ] && cp -rf /workspace/VortexOS/* /tmp/profile/ || true
+              [ -f '/workspace/packages.x86_64' ] && cp -f /workspace/packages.x86_64 /tmp/profile/ || true
+              [ -d '/workspace/grub' ] && cp -rf /workspace/grub /tmp/profile/ || true
+              [ -d '/workspace/syslinux' ] && cp -rf /workspace/syslinux /tmp/profile/ || true
+              [ -d '/workspace/efiboot' ] && cp -rf /workspace/efiboot /tmp/profile/ || true
 
-            chmod +x profiledef.sh
+              # نقل profiledef.sh المجهز إلى مجلد البناء
+              cp -f /workspace/profiledef.sh /tmp/profile/profiledef.sh
 
-            echo '=== 4. إصلاح سطر الإقلاع لتفادي emergency shell ==='
-            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
-            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
-            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
+              cd /tmp/profile
 
-            echo '=== 5. تشغيل mkarchiso 🚀 ==='
-            mkdir -p /workspace/out
-            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
-          "
+              echo '=== 3. إصلاح سطر الإقلاع لتفادي emergency shell ==='
+              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
+              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
+
+              echo '=== 4. تشغيل mkarchiso 🚀 ==='
+              mkdir -p /workspace/out
+              mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
+            "
 
       - name: Upload ISO Artifact
         uses: actions/upload-artifact@v4
