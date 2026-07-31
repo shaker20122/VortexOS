@@ -12,7 +12,7 @@ jobs:
 
       - name: Build ISO using Arch Linux Docker Container
         run: |
-          # 1. إنشاء ملف البروفايل بأمان على الـ Runner لتفادي أخطاء الأقواس (Redirection)
+          # 1. إنشاء ملف profiledef.sh بأمان
           cat > profiledef.sh <<'EOF'
           #!/bin/bash
           # profiledef.sh for Vortex OS
@@ -34,7 +34,7 @@ jobs:
           
           chmod +x profiledef.sh
 
-          # 2. تشغيل الحاوية وتركيب المستودع كاملاً
+          # 2. تشغيل عملية البناء داخل الحاوية
           docker run --privileged --rm \
             -v "${{ github.workspace }}:/workspace" \
             archlinux:latest bash -c "
@@ -50,10 +50,10 @@ jobs:
               mkdir -p /tmp/profile
               cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
 
-              # دمج الملف الآمن اللي صنعناه بالخارج إلى داخل البروفايل
+              # نقل profiledef.sh المجهز
               cp -f /workspace/profiledef.sh /tmp/profile/profiledef.sh
 
-              echo '=== 3. دمج ملفات التوزيعة (VortexOS) ==='
+              echo '=== 3. دمج ملفات التوزيعة ==='
               [ -d '/workspace/VortexOS' ] && cp -rf /workspace/VortexOS/* /tmp/profile/ || true
               [ -f '/workspace/packages.x86_64' ] && cp -f /workspace/packages.x86_64 /tmp/profile/ || true
               [ -d '/workspace/grub' ] && cp -rf /workspace/grub /tmp/profile/ || true
@@ -62,9 +62,11 @@ jobs:
 
               cd /tmp/profile
 
-              echo '=== 4. إصلاح مسارات الإقلاع ==='
+              echo '=== 4. إصلاح وتوحيد الـ Label في جميع ملفات الإقلاع ==='
+              # استبدال كل المتغيرات والـ UUID بأمر صريح يفرض archisolabel=VortexOS
               find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
               find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisolabel=ARCH_[0-9]*/archisolabel=VortexOS/g' {} +
               find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
 
               echo '=== 5. تشغيل mkarchiso 🚀 ==='
