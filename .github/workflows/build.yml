@@ -21,18 +21,19 @@ jobs:
             pacman -Sy --noconfirm archlinux-keyring
             pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
 
-            echo '=== 2. تجهيز مجلد البناء ==='
+            echo '=== 2. تجهيز مجلد البناء وجمع الملفات ==='
             mkdir -p /tmp/profile
 
-            # إذا كانت ملفات التوزيعة داخل مجلد VortexOS انسخ محتوياته
+            # 1. نسخ كل الملفات الموجودة في الجذر (بما فيها profiledef.sh و packages.x86_64)
+            cp -rn /workspace/* /tmp/profile/ 2>/dev/null || true
+
+            # 2. إذا كانت هناك ملفات داخل مجلد VortexOS ننسخ محتوياتها أيضاً
             if [ -d '/workspace/VortexOS' ]; then
-              cp -r /workspace/VortexOS/* /tmp/profile/ 2>/dev/null || true
+              cp -rn /workspace/VortexOS/* /tmp/profile/ 2>/dev/null || true
             fi
 
-            # نسخ بقية الملفات الأساسية مثل grub و syslinux و efiboot إن وجدت في الجذر
-            cp -r /workspace/efiboot /tmp/profile/ 2>/dev/null || true
-            cp -r /workspace/grub /tmp/profile/ 2>/dev/null || true
-            cp -r /workspace/syslinux /tmp/profile/ 2>/dev/null || true
+            # تنظيف أي مجلدات workflow تم نسخها بالخطأ
+            rm -rf /tmp/profile/.github /tmp/profile/.git
 
             cd /tmp/profile
 
@@ -45,7 +46,7 @@ jobs:
 
             echo '=== 4. تشغيل mkarchiso 🚀 ==='
             mkdir -p /workspace/out
-            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
           "
 
       - name: Upload ISO Artifact
