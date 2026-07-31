@@ -13,34 +13,31 @@ jobs:
       - name: Build ISO using Arch Linux Docker Container
         run: |
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
-            set -euo pipefail
+            set -e
 
             echo '=== 1. تثبيت حزم البناء ==='
             pacman-key --init
             pacman-key --populate archlinux
             pacman -Sy --noconfirm archlinux-keyring
-            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr rsync
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
 
-            echo '=== 2. تجهيز مجلد البناء وتجاهل ملفات Workflow ==='
+            echo '=== 2. تجهيز مجلد البناء ==='
             mkdir -p /tmp/profile
-            
-            # نسخ ملفات المستودع باستثناء مجلد .github و .git
-            rsync -av --exclude='.github' --exclude='.git' /workspace/ /tmp/profile/
-
-            # دمج مجلد VortexOS إذا كان موجوداً
-            if [ -d '/workspace/VortexOS' ]; then
-              rsync -av /workspace/VortexOS/ /tmp/profile/
-            fi
+            cp -r /workspace/* /tmp/profile/ 2>/dev/null || true
+            rm -rf /tmp/profile/.github /tmp/profile/.git
 
             cd /tmp/profile
 
-            echo '=== 3. تأكيد ضبط Label الإقلاع ==='
-            sed -i 's/^iso_label=.*/iso_label="VortexOS"/' profiledef.sh
+            echo '=== 3. إصلاح ملفات الإقلاع وتثبيت Label ==='
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
+
             chmod +x profiledef.sh 2>/dev/null || true
 
             echo '=== 4. تشغيل mkarchiso 🚀 ==='
             mkdir -p /workspace/out
-            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
+            mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
           "
 
       - name: Upload ISO Artifact
