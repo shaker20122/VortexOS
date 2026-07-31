@@ -10,42 +10,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build ISO using Arch Linux Docker Container
+      - name: Build ISO directly from repository
         run: |
           docker run --privileged --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
             set -euo pipefail
 
-            echo '=== 1. تهيئة المفاتيح والحزم ==='
+            echo '=== 1. تثبيت أدوات البناء ==='
             pacman-key --init
             pacman-key --populate archlinux
             pacman -Sy --noconfirm archlinux-keyring
-            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr sed findutils
+            pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
 
-            echo '=== 2. تجهيز مجلد البناء ==='
-            mkdir -p /tmp/build_profile
-            
-            # نسخ قالب releng الأساسي
-            cp -r /usr/share/archiso/configs/releng/* /tmp/build_profile/
+            cd /workspace
 
-            # دمج ملفاتك فوق القالب
-            cp -r /workspace/* /tmp/build_profile/ 2>/dev/null || true
-            if [ -d '/workspace/VortexOS' ]; then
-              cp -r /workspace/VortexOS/* /tmp/build_profile/ 2>/dev/null || true
-            fi
+            echo '=== 2. استبدال المتغيرات في ملفات مشروعك ==='
+            # استبدال صريح لجميع الكلمات الدليلية في كل ملفات الإقلاع
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=[^ ]*/archisolabel=VortexOS/g' {} +
+            find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
 
-            cd /tmp/build_profile
+            chmod +x profiledef.sh 2>/dev/null || true
 
-            echo '=== 3. إصلاح واستبدال مسارات الإقلاع بشكل شامل ==='
-            # ضبط iso_label في profiledef.sh
-            sed -i 's/^iso_label=.*/iso_label="VortexOS"/' profiledef.sh
-
-            # استبدال كافة التلميحات والمتغيرات في جميع الملفات بدون استثناء امتداد
-            find . -type f -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
-            find . -type f -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
-            find . -type f -exec sed -i 's/archisosearchuuid=[^ ]*/archisolabel=VortexOS/g' {} +
-            find . -type f -exec sed -i 's/archisobasedir=%INSTALL_DIR%/archisobasedir=arch/g' {} +
-
-            echo '=== 4. تشغيل عملية البناء  ==='
+            echo '=== 3. تشغيل البناء  ==='
+            mkdir -p /workspace/out
             mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out .
           "
 
