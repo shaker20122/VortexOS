@@ -81,8 +81,16 @@ jobs:
           sudo apt-get install -y ovmf
           ISO=$(find out -name "*.iso" | head -n 1)
           echo "Testing UEFI Boot for ISO: $ISO"
-          cp /usr/share/OVMF/OVMF_CODE.fd /tmp/OVMF_CODE.fd
-          cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
+          
+          # البحث التلقائي عن ملفات OVMF لتفادي اختلاف مساراتها في تحديثات أوبونتو
+          OVMF_CODE=$(find /usr/share -name "OVMF_CODE*.fd" | head -n 1)
+          OVMF_VARS=$(find /usr/share -name "OVMF_VARS*.fd" | head -n 1)
+          
+          echo "Found OVMF_CODE at: $OVMF_CODE"
+          echo "Found OVMF_VARS at: $OVMF_VARS"
+          
+          cp "$OVMF_CODE" /tmp/OVMF_CODE.fd
+          cp "$OVMF_VARS" /tmp/OVMF_VARS.fd
           
           timeout 120 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
             -drive if=pflash,format=raw,readonly=on,file=/tmp/OVMF_CODE.fd \
