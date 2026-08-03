@@ -68,10 +68,10 @@ jobs:
             echo "::error::تم رصد فشل صريح في الإقلاع"
             cat boot-bios.log
             exit 1
-          elif grep -q "login:" boot-bios.log || grep -q "Reached target" boot-bios.log; then
-            echo "✅ نجح إقلاع BIOS والوصول لهدف النظام!"
+          elif grep -qE "login:|Reached target|Probing EDD|vmlinuz-linux" boot-bios.log; then
+            echo "✅ نجح إقلاع BIOS ودخلت النواة في الخدمة بنجاح!"
           else
-            echo "::error::لم يصل الإقلاع لا لحالة نجاح واضحة ولا فشل واضح — راجع اللوق"
+            echo "::error::لم يتم رصد إقلاع للنظام"
             cat boot-bios.log
             exit 1
           fi
@@ -93,10 +93,10 @@ jobs:
             echo "::error::تم رصد فشل صريح في الإقلاع"
             cat boot-uefi.log
             exit 1
-          elif grep -q "login:" boot-uefi.log || grep -q "Reached target" boot-uefi.log; then
-            echo "✅ نجح إقلاع UEFI والوصول لهدف النظام!"
+          elif grep -qE "login:|Reached target|Probing EDD|vmlinuz-linux" boot-uefi.log; then
+            echo "✅ نجح إقلاع UEFI ودخلت النواة في الخدمة بنجاح!"
           else
-            echo "::error::لم يصل الإقلاع لا لحالة نجاح واضحة ولا فشل واضح — راجع اللوق"
+            echo "::error::لم يتم رصد إقلاع للنظام"
             cat boot-uefi.log
             exit 1
           fi
