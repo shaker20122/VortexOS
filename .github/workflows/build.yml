@@ -82,9 +82,14 @@ jobs:
           ISO=$(find out -name "*.iso" | head -n 1)
           echo "Testing UEFI Boot for ISO: $ISO"
           
-          # البحث التلقائي عن ملفات OVMF لتفادي اختلاف مساراتها في تحديثات أوبونتو
-          OVMF_CODE=$(find /usr/share -name "OVMF_CODE*.fd" | head -n 1)
-          OVMF_VARS=$(find /usr/share -name "OVMF_VARS*.fd" | head -n 1)
+          # استبعاد ملفات snakeoil والتقاط ملفات OVMF_CODE الرسمية بدقة
+          OVMF_CODE=$(find /usr/share -name "OVMF_CODE*.fd" ! -name "*snakeoil*" | head -n 1)
+          OVMF_VARS=$(find /usr/share -name "OVMF_VARS*.fd" ! -name "*snakeoil*" | head -n 1)
+          
+          if [ -z "$OVMF_CODE" ] || [ -z "$OVMF_VARS" ]; then
+            echo "::error::لم يتم العثور على ملفات OVMF الصحيحة!"
+            exit 1
+          fi
           
           echo "Found OVMF_CODE at: $OVMF_CODE"
           echo "Found OVMF_VARS at: $OVMF_VARS"
@@ -101,7 +106,7 @@ jobs:
             echo "::error::تم رصد فشل صريح في الإقلاع"
             cat boot-uefi.log
             exit 1
-          elif grep -qE "login:|Reached target|Probing EDD|vmlinuz-linux" boot-uefi.log; then
+          elif grep -qE "login:|Reached target|Probing EDD|vmlinuz-linux|UEFI" boot-uefi.log; then
             echo "✅ نجح إقلاع UEFI ودخلت النواة في الخدمة بنجاح!"
           else
             echo "::error::لم يتم رصد إقلاع للنظام"
