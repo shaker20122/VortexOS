@@ -52,17 +52,26 @@ jobs:
             -w /workspace \
             archlinux:latest ./build-vortexos.sh
 
+      - name: Generate Checksum
+        run: |
+          sha256sum out/*.iso > out/VortexOS.sha256
+
       - name: Real Boot Test - BIOS Path
         run: |
           sudo apt-get update && sudo apt-get install -y qemu-system-x86
           ISO=$(find out -name "*.iso" | head -n 1)
-          timeout 70 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
+          echo "Testing BIOS Boot for ISO: $ISO"
+          timeout 120 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
             -nographic -serial mon:stdio -display none | tee boot-bios.log || true
           
-          if grep -q "login:" boot-bios.log || grep -q "Reached target" boot-bios.log; then
-            echo "✅ نجح إقلاع BIOS!"
+          if grep -qE "Failed to mount|Emergency Shell|Kernel panic" boot-bios.log; then
+            echo "::error::تم رصد فشل صريح في الإقلاع"
+            cat boot-bios.log
+            exit 1
+          elif grep -q "login:" boot-bios.log || grep -q "Reached target" boot-bios.log; then
+            echo "✅ نجح إقلاع BIOS والوصول لهدف النظام!"
           else
-            echo "::error::فشل إقلاع BIOS"
+            echo "::error::لم يصل الإقلاع لا لحالة نجاح واضحة ولا فشل واضح — راجع اللوق"
             cat boot-bios.log
             exit 1
           fi
@@ -71,18 +80,23 @@ jobs:
         run: |
           sudo apt-get install -y ovmf
           ISO=$(find out -name "*.iso" | head -n 1)
+          echo "Testing UEFI Boot for ISO: $ISO"
           cp /usr/share/OVMF/OVMF_CODE.fd /tmp/OVMF_CODE.fd
           cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
           
-          timeout 70 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
+          timeout 120 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
             -drive if=pflash,format=raw,readonly=on,file=/tmp/OVMF_CODE.fd \
             -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd \
             -nographic -serial mon:stdio -display none | tee boot-uefi.log || true
           
-          if grep -q "login:" boot-uefi.log || grep -q "Reached target" boot-uefi.log; then
-            echo "✅ نجح إقلاع UEFI!"
+          if grep -qE "Failed to mount|Emergency Shell|Kernel panic" boot-uefi.log; then
+            echo "::error::تم رصد فشل صريح في الإقلاع"
+            cat boot-uefi.log
+            exit 1
+          elif grep -q "login:" boot-uefi.log || grep -q "Reached target" boot-uefi.log; then
+            echo "✅ نجح إقلاع UEFI والوصول لهدف النظام!"
           else
-            echo "::error::فشل إقلاع UEFI"
+            echo "::error::لم يصل الإقلاع لا لحالة نجاح واضحة ولا فشل واضح — راجع اللوق"
             cat boot-uefi.log
             exit 1
           fi
@@ -91,4 +105,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VortexOS-ISO
-          path: out/*.iso
+          path: |
+            out/*.iso
+            out/*.sha256
+          retention-days: 14
