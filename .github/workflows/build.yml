@@ -42,6 +42,10 @@ jobs:
           echo '=== 5. تشغيل mkarchiso 🚀 ==='
           mkdir -p /workspace/out
           mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
+
+          echo '=== 6. توليد الـ Checksum بنفس الصلاحية ==='
+          cd /workspace/out
+          sha256sum *.iso > VortexOS.sha256
           SCRIPT_EOF
           chmod +x build-vortexos.sh
 
@@ -51,10 +55,6 @@ jobs:
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
             archlinux:latest ./build-vortexos.sh
-
-      - name: Generate Checksum
-        run: |
-          sha256sum out/*.iso > out/VortexOS.sha256
 
       - name: Real Boot Test - BIOS Path
         run: |
