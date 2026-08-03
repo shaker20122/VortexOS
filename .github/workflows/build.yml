@@ -10,68 +10,82 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Write build script
+        run: |
+          cat > build-vortexos.sh <<'SCRIPT_EOF'
+          #!/bin/bash
+          set -e
+
+          echo '=== 1. تثبيت حزم البناء ==='
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils rsync
+
+          echo '=== 2. تجهيز البروفايل من القالب الرسمي ==='
+          mkdir -p /tmp/profile
+          cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
+
+          echo '=== 3. دمج ملفات المستودع (باستثناء مجلدات الإقلاع القديمة) ==='
+          rsync -a --exclude='.git/' \
+                   --exclude='.github/' \
+                   --exclude='grub/' \
+                   --exclude='syslinux/' \
+                   --exclude='efiboot/' \
+                   /workspace/ /tmp/profile/
+
+          echo '=== 4. ترقيع العناوين النصية فقط ==='
+          find /tmp/profile/grub /tmp/profile/syslinux /tmp/profile/efiboot \
+               -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) 2>/dev/null \
+               | xargs -r sed -i 's/Arch Linux install medium/Vortex OS Live Medium/g; s/Arch Linux/Vortex OS/g'
+
+          echo '=== 5. تشغيل mkarchiso 🚀 ==='
+          mkdir -p /workspace/out
+          mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
+          SCRIPT_EOF
+          chmod +x build-vortexos.sh
+
       - name: Build ISO using Arch Linux Docker Container
         run: |
-          # 1. إنشاء profiledef.sh بأمان
-          cat > profiledef.sh <<'EOF'
-          #!/bin/bash
-          # profiledef.sh for Vortex OS
-
-          iso_name="VortexOS"
-          iso_label="VortexOS"
-          iso_publisher="Shaker S_12 <https://github.com/shaker20122>"
-          iso_application="Vortex OS Live/Installation Media"
-          iso_version="$(date +%Y.%m.%d)"
-          install_dir="arch"
-          buildmodes=('iso')
-          bootmodes=('bios.syslinux' 'uefi.grub')
-          arch="x86_64"
-          pacman_conf="pacman.conf"
-          file_permissions=(
-            ["/etc/shadow"]="0:0:0400"
-          )
-          EOF
-          
-          chmod +x profiledef.sh
-
-          # 2. تشغيل عملية البناء
           docker run --privileged --rm \
             -v "${{ github.workspace }}:/workspace" \
-            archlinux:latest bash -c "
-              set -e
+            -w /workspace \
+            archlinux:latest ./build-vortexos.sh
 
-              echo '=== 1. تثبيت حزم البناء ==='
-              pacman-key --init
-              pacman-key --populate archlinux
-              pacman -Sy --noconfirm archlinux-keyring
-              pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils
+      - name: Real Boot Test - BIOS Path
+        run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86
+          ISO=$(find out -name "*.iso" | head -n 1)
+          timeout 70 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
+            -nographic -serial mon:stdio -display none | tee boot-bios.log || true
+          
+          if grep -q "login:" boot-bios.log || grep -q "Reached target" boot-bios.log; then
+            echo "✅ نجح إقلاع BIOS!"
+          else
+            echo "::error::فشل إقلاع BIOS"
+            cat boot-bios.log
+            exit 1
+          fi
 
-              echo '=== 2. تجهيز البروفايل من القالب الرسمي ==='
-              mkdir -p /tmp/profile
-              cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
-
-              # نقل profiledef.sh المجهز
-              cp -f /workspace/profiledef.sh /tmp/profile/profiledef.sh
-
-              echo '=== 3. دمج ملفات التوزيعة ==='
-              [ -d '/workspace/VortexOS' ] && cp -rf /workspace/VortexOS/* /tmp/profile/ || true
-              [ -f '/workspace/packages.x86_64' ] && cp -f /workspace/packages.x86_64 /tmp/profile/ || true
-              
-              # ملاحظة: تم إيقاف نسخ مجلدات grub/syslinux القديمة لتجنب تضارب الـ Bootloader
-
-              cd /tmp/profile
-
-              echo '=== 4. فرض اسم VortexOS على كل إعدادات الإقلاع ==='
-              # استبدال شامل لأي خيار إقلاع قد يحتوي على UUID أو Label متغير
-              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/%ARCHISO_LABEL%/VortexOS/g' {} +
-              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=%ARCHISO_UUID%/archisolabel=VortexOS/g' {} +
-              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisosearchuuid=[^ ]*/archisolabel=VortexOS/g' {} +
-              find . -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) -exec sed -i 's/archisolabel=[^ ]*/archisolabel=VortexOS/g' {} +
-
-              echo '=== 5. تشغيل mkarchiso 🚀 ==='
-              mkdir -p /workspace/out
-              mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
-            "
+      - name: Real Boot Test - UEFI Path
+        run: |
+          sudo apt-get install -y ovmf
+          ISO=$(find out -name "*.iso" | head -n 1)
+          cp /usr/share/OVMF/OVMF_CODE.fd /tmp/OVMF_CODE.fd
+          cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
+          
+          timeout 70 qemu-system-x86_64 -m 2048 -cdrom "$ISO" -boot d \
+            -drive if=pflash,format=raw,readonly=on,file=/tmp/OVMF_CODE.fd \
+            -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd \
+            -nographic -serial mon:stdio -display none | tee boot-uefi.log || true
+          
+          if grep -q "login:" boot-uefi.log || grep -q "Reached target" boot-uefi.log; then
+            echo "✅ نجح إقلاع UEFI!"
+          else
+            echo "::error::فشل إقلاع UEFI"
+            cat boot-uefi.log
+            exit 1
+          fi
 
       - name: Upload ISO Artifact
         uses: actions/upload-artifact@v4
