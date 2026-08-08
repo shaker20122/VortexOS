@@ -26,7 +26,7 @@ jobs:
           mkdir -p /tmp/profile
           cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
 
-          echo '=== 3. دمج ملفات المستودع (باستثناء مجلدات الإقلاع القديمة) ==='
+          echo '=== 3. دمج ملفات المستودع ==='
           rsync -a --exclude='.git/' \
                    --exclude='.github/' \
                    --exclude='grub/' \
@@ -34,16 +34,20 @@ jobs:
                    --exclude='efiboot/' \
                    /workspace/ /tmp/profile/
 
-          echo '=== 4. ترقيع العناوين النصية فقط ==='
-          find /tmp/profile/grub /tmp/profile/syslinux /tmp/profile/efiboot \
-               -type f \( -name '*.cfg' -o -name '*.conf' -o -name '*.entry' \) 2>/dev/null \
-               | xargs -r sed -i 's/Arch Linux install medium/Vortex OS Live Medium/g; s/Arch Linux/Vortex OS/g'
+          echo '=== 4. ترقيع العناوين النصية بأمان (بدون المساس بمعاملات الإقلاع) ==='
+          # GRUB
+          sed -i '/^[[:space:]]*menuentry/ s/Arch Linux/Vortex OS/g' /tmp/profile/grub/grub.cfg 2>/dev/null || true
+          # Syslinux
+          sed -i '/^[[:space:]]*MENU LABEL/ s/Arch Linux/Vortex OS/g' /tmp/profile/syslinux/*.cfg 2>/dev/null || true
+          sed -i '/^[[:space:]]*MENU TITLE/ s/Arch Linux/Vortex OS/g' /tmp/profile/syslinux/*.cfg 2>/dev/null || true
+          # Systemd-boot (efiboot)
+          sed -i '/^title/ s/Arch Linux/Vortex OS/g' /tmp/profile/efiboot/loader/entries/*.conf 2>/dev/null || true
 
           echo '=== 5. تشغيل mkarchiso 🚀 ==='
           mkdir -p /workspace/out
           mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
 
-          echo '=== 6. توليد الـ Checksum بنفس الصلاحية ==='
+          echo '=== 6. توليد الـ Checksum ==='
           cd /workspace/out
           sha256sum *.iso > VortexOS.sha256
           SCRIPT_EOF
@@ -82,18 +86,13 @@ jobs:
           ISO=$(find out -name "*.iso" | head -n 1)
           echo "Testing UEFI Boot for ISO: $ISO"
           
-          # التقاط ملفات OVMF القياسية بدون secboot/snakeoil لضمان الإقلاع النصي
           OVMF_CODE=$(find /usr/share -name "OVMF_CODE*.fd" ! -name "*snakeoil*" ! -name "*secboot*" | head -n 1)
           OVMF_VARS=$(find /usr/share -name "OVMF_VARS*.fd" ! -name "*snakeoil*" ! -name "*secboot*" | head -n 1)
           
-          # fallback في حال عدم العثور عليها
           if [ -z "$OVMF_CODE" ]; then
             OVMF_CODE=$(find /usr/share -name "OVMF_CODE*.fd" | head -n 1)
             OVMF_VARS=$(find /usr/share -name "OVMF_VARS*.fd" | head -n 1)
           fi
-
-          echo "Found OVMF_CODE at: $OVMF_CODE"
-          echo "Found OVMF_VARS at: $OVMF_VARS"
           
           cp "$OVMF_CODE" /tmp/OVMF_CODE.fd
           cp "$OVMF_VARS" /tmp/OVMF_VARS.fd
