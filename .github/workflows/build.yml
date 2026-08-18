@@ -16,18 +16,19 @@ jobs:
           #!/bin/bash
           set -e
 
-          echo '=== 1. Initialize Keys & Environment ==='
+          echo '=== 1. Initialize Keys & Install Dependencies ==='
           pacman-key --init
           pacman-key --populate archlinux
+
+          # Mask mkinitcpio hooks to prevent pacman transaction failure in container
+          mkdir -p /etc/pacman.d/hooks
+          ln -sf /dev/null /etc/pacman.d/hooks/90-mkinitcpio-install.hook
+          ln -sf /dev/null /etc/pacman.d/hooks/60-mkinitcpio-remove.hook
+
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm base-devel archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils rsync mkinitcpio
+          pacman -Syu --noconfirm base-devel archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils rsync
 
-          echo '=== 2. Force Reinstall Hooks & Rebuild Presets ==='
-          # Overwrite to ensure archiso hooks are injected into the initramfs correctly
-          pacman -S --noconfirm --overwrite='*' archiso mkinitcpio
-          mkinitcpio -P
-
-          echo '=== 3. Setup Profile & Merge Sources ==='
+          echo '=== 2. Setup Profile & Merge Sources ==='
           mkdir -p /tmp/profile
           cp -r /usr/share/archiso/configs/releng/* /tmp/profile/
 
@@ -41,20 +42,20 @@ jobs:
                     --exclude='build-vortexos.sh' \
                     /workspace/ /tmp/profile/
 
-          echo '=== 4. Inject Serial Console & Kernel Flags ==='
+          echo '=== 3. Inject Serial Console & Kernel Flags ==='
           sed -i '/^menuentry "/ s/Arch Linux/VortexOS/g' /tmp/profile/grub/grub.cfg
-          
+
           # Safely append parameters for Syslinux & GRUB to enable QEMU serial output
           for cfg in /tmp/profile/syslinux/*.cfg; do
             [ -f "$cfg" ] && sed -i '/^[[:space:]]*APPEND/ s|$| edd=off console=ttyS0|' "$cfg"
           done
           sed -i '/^[[:space:]]*linux /{ /console=ttyS0/! s|$| edd=off console=ttyS0|; }' /tmp/profile/grub/grub.cfg
 
-          echo '=== 5. Execute mkarchiso Build ==='
+          echo '=== 4. Execute mkarchiso Build ==='
           mkdir -p /workspace/out
           mkarchiso -v -w /tmp/archiso-tmp -o /workspace/out /tmp/profile
 
-          echo '=== 6. Generate SHA256 Checksum ==='
+          echo '=== 5. Generate SHA256 Checksum ==='
           cd /workspace/out
           sha256sum *.iso > VortexOS.sha256
           SCRIPT_EOF
