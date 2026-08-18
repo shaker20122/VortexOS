@@ -16,11 +16,14 @@ jobs:
           #!/bin/bash
           set -e
 
-          echo '=== 1. Install build packages ==='
+          echo '=== 1. Install build packages & verify hooks ==='
           pacman-key --init
           pacman-key --populate archlinux
           pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils rsync
+          pacman -Syu --noconfirm base-devel archiso grub syslinux mtools dosfstools xorriso efibootmgr findutils rsync mkinitcpio
+
+          # Force reinstall archiso & mkinitcpio to register hooks properly
+          pacman -S --noconfirm archiso mkinitcpio
 
           echo '=== 2. Start from the official releng template ==='
           mkdir -p /tmp/profile
@@ -56,7 +59,7 @@ jobs:
           docker run --privileged --rm \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            archlinux:latest ./build-vortexos.sh
+            archlinux:base-devel ./build-vortexos.sh
 
       - name: Real Boot Test - BIOS Path
         run: |
