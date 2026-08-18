@@ -39,10 +39,14 @@ jobs:
                    --exclude='build-vortexos.sh' \
                    /workspace/ /tmp/profile/
 
-          echo '=== 4. Patch ONLY the visible menu titles - never kernel cmdline lines ==='
+          echo '=== 4. Patch menu titles & bypass EDD hang ==='
           sed -i '/^menuentry "/ s/Arch Linux/VortexOS/g' /tmp/profile/grub/grub.cfg
           sed -i '/^[[:space:]]*MENU LABEL/ s/Arch Linux/VortexOS/g' /tmp/profile/syslinux/*.cfg
           sed -i '/^[[:space:]]*MENU TITLE/ s/Arch Linux/VortexOS/g' /tmp/profile/syslinux/*.cfg
+          
+          # Inject edd=off to bypass Probing EDD hang in QEMU
+          sed -i '/^[[:space:]]*linux /{ /edd=off/! s|$| edd=off|; }' /tmp/profile/grub/grub.cfg
+          sed -i '/^[[:space:]]*APPEND /{ /edd=off/! s|$| edd=off|; }' /tmp/profile/syslinux/*.cfg
 
           echo '=== 5. Run mkarchiso (injects iso_label from profiledef.sh itself) ==='
           mkdir -p /workspace/out
